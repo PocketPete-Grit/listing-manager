@@ -66,6 +66,16 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
       <div class="hint">Fills the listing facts from the MLS record — you still set showings, offers, and private info below.</div>
       <div id="mlsresults"></div>
     </div>
+    <div class="card">
+      <label for="sptext">🧠 Smart paste — drop in a transcript, seller texts, or any notes</label>
+      <textarea id="sptext" placeholder="e.g. talked to the seller — roof is 7 years old, showings need 24h notice through Jaime, presenting offers Tuesday at 5..."></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn" id="spbtn">Organize with AI</button>
+        <span class="hint" id="spstatus"></span>
+      </div>
+      <div class="hint">Sorts your notes into the right fields below (codes &amp; sensitive info go to PRIVATE; house details like roof age become Facts). Changed fields get highlighted — review, then Save.</div>
+      <div id="spsummary" style="display:none;margin-top:8px;padding:10px;border-radius:8px;background:#eef6ff;font-size:14px"></div>
+    </div>
     <div class="card" id="fields"></div>
     <div style="display:flex;justify-content:space-between;margin:8px 0 40px">
       <button class="btn danger" id="delbtn" style="display:none">Delete</button>
@@ -150,6 +160,9 @@ const FIELDS = [
   {s:"Marketing"},
   {k:"public_remarks", l:"Public description (the bot may read from this)", t:"ta"},
   {k:"open_house", l:"Open houses — one per line", t:"oh", h:'e.g. "Saturday June 14, 1-3pm"'},
+  {s:"Listing facts — extra Q&A the bots can answer"},
+  {k:"extra_facts", l:'Facts — one per line as "Key: value"', t:"facts",
+   h:'Spoken to callers when asked. e.g. "Roof: 7 years old" / "Boiler: replaced 2021" / "Cesspool: pumped March 2026"'},
   {s:"PRIVATE — the bot can NEVER see or say these", priv:1},
   {k:"lockbox_code", l:"Lockbox code", priv:1},
   {k:"gate_code", l:"Gate / alarm code", priv:1},
@@ -231,9 +244,10 @@ function inputFor(f, val){
     }
     return s;
   }
-  if (f.t==="ta" || f.t==="oh"){
+  if (f.t==="ta" || f.t==="oh" || f.t==="facts"){
     const ta=document.createElement("textarea"); ta.id="f-"+f.k;
     if (f.t==="oh") ta.value=Array.isArray(val)?val.join("\n"):"";
+    else if (f.t==="facts") ta.value=(val&&typeof val==="object")?Object.entries(val).map(([k,v])=>k+": "+v).join("\n"):"";
     else ta.value=val??"";
     return ta;
   }
@@ -295,6 +309,15 @@ function collect(){
       const lines=e.value.split("\n").map(x=>x.trim()).filter(Boolean);
       row[f.k]=lines.length?lines:null; continue;
     }
+    if (f.t==="facts"){
+      const obj={};
+      for (const line of e.value.split("\n")){
+        const i=line.indexOf(":"); if (i<1) continue;
+        const k=line.slice(0,i).trim(), v=line.slice(i+1).trim();
+        if (k&&v) obj[k]=v;
+      }
+      row[f.k]=Object.keys(obj).length?obj:null; continue;
+    }
     if (f.t==="dt"){ row[f.k]=e.value?new Date(e.value).toISOString():""; continue; }
     row[f.k]=e.value;
   }
@@ -345,6 +368,54 @@ async function mlsSearch(){
 }
 $("mlsbtn").onclick=mlsSearch;
 $("mlsq").addEventListener("keydown",(e)=>{ if(e.key==="Enter") mlsSearch(); });
+
+const FIELD_BY_KEY={}; for (const f of FIELDS) if (f.k) FIELD_BY_KEY[f.k]=f;
+function setField(key, val){
+  const f=FIELD_BY_KEY[key], e=$("f-"+key);
+  if (!f || !e || val==null) return false;
+  if (f.t==="bool"){ e.checked=!!val; }
+  else if (f.t==="dt"){
+    const d=new Date(val);
+    if (isNaN(d)) return false;
+    const p=(n)=>String(n).padStart(2,"0");
+    e.value=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+  }
+  else if (f.t==="oh"){ e.value=Array.isArray(val)?val.join("\n"):String(val); }
+  else { e.value=String(val); }
+  e.style.background="#fff8c5";
+  return true;
+}
+async function smartPaste(){
+  const text=$("sptext").value.trim();
+  if (!text){ toast("Paste some notes first"); return; }
+  $("spstatus").textContent="Organizing…"; $("spbtn").disabled=true;
+  try {
+    const d=await api("smart_extract",{listing_id:editingId, text});
+    const ex=d.extraction||{};
+    let applied=0;
+    for (const [k,v] of Object.entries(ex.public_updates||{})) if (setField(k,v)) applied++;
+    for (const [k,v] of Object.entries(ex.private_updates||{})) if (setField(k,v)) applied++;
+    const facts=ex.facts||{};
+    if (Object.keys(facts).length){
+      const ta=$("f-extra_facts");
+      const cur={};
+      for (const line of ta.value.split("\n")){
+        const i=line.indexOf(":"); if (i>0){ cur[line.slice(0,i).trim()]=line.slice(i+1).trim(); }
+      }
+      Object.assign(cur, facts);
+      ta.value=Object.entries(cur).map(([k,v])=>k+": "+v).join("\n");
+      ta.style.background="#fff8c5";
+      applied+=Object.keys(facts).length;
+    }
+    const sum=$("spsummary");
+    sum.style.display="";
+    sum.textContent="✓ "+(ex.summary||"Organized.")+" ("+applied+" updates — highlighted below)";
+    $("sptext").value="";
+    toast("Review the highlighted fields, then Save");
+  } catch(e){ toast(e.message); }
+  finally { $("spstatus").textContent=""; $("spbtn").disabled=false; }
+}
+$("spbtn").onclick=smartPaste;
 
 $("loginbtn").onclick=()=>{ PW=$("pw").value.trim(); localStorage.setItem("la_pw",PW); loadList(); };
 $("pw").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("loginbtn").click(); });

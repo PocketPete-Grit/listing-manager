@@ -57,6 +57,15 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
       <button class="btn sec" id="backbtn">&larr; All listings</button>
       <button class="btn" id="savetop">Save listing</button>
     </div>
+    <div class="card">
+      <label for="mlsq">Import from OneKey MLS — number or address</label>
+      <div style="display:flex;gap:8px">
+        <input id="mlsq" placeholder="e.g. KEY1003811 or 37 Coe Place">
+        <button class="btn sec" id="mlsbtn" style="flex:0 0 auto">Search&nbsp;MLS</button>
+      </div>
+      <div class="hint">Fills the listing facts from the MLS record — you still set showings, offers, and private info below.</div>
+      <div id="mlsresults"></div>
+    </div>
     <div class="card" id="fields"></div>
     <div style="display:flex;justify-content:space-between;margin:8px 0 40px">
       <button class="btn danger" id="delbtn" style="display:none">Delete</button>
@@ -309,6 +318,33 @@ async function del(){
   try { await api("delete",{id:editingId}); toast("Deleted"); loadList(); }
   catch(e){ toast(e.message); }
 }
+
+async function mlsSearch(){
+  const q=$("mlsq").value.trim();
+  if (!q){ toast("Type an MLS number or address"); return; }
+  const box=$("mlsresults"); box.textContent="Searching…";
+  try {
+    const d=await api("mls_lookup",{query:q});
+    box.textContent="";
+    if (!d.matches.length){ box.textContent="No MLS match — check the number or street."; return; }
+    for (const m of d.matches){
+      const b=document.createElement("button");
+      b.className="btn sec"; b.style.display="block"; b.style.margin="8px 0"; b.style.textAlign="left";
+      b.textContent=m.label;
+      b.onclick=()=>{
+        for (const [k,v] of Object.entries(m.fields)){
+          const e=$("f-"+k); if (!e) continue;
+          if (e.type==="checkbox") e.checked=!!v; else e.value=v??"";
+        }
+        box.textContent="";
+        toast("Imported — review below, then Save");
+      };
+      box.appendChild(b);
+    }
+  } catch(e){ box.textContent=""; toast(e.message); }
+}
+$("mlsbtn").onclick=mlsSearch;
+$("mlsq").addEventListener("keydown",(e)=>{ if(e.key==="Enter") mlsSearch(); });
 
 $("loginbtn").onclick=()=>{ PW=$("pw").value.trim(); localStorage.setItem("la_pw",PW); loadList(); };
 $("pw").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("loginbtn").click(); });

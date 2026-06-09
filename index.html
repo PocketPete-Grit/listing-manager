@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Listing Manager — AI Receptionist</title>
+<style>
+:root{--b:#1f6feb;--bg:#f6f8fa;--card:#fff;--line:#d8dee4;--txt:#1f2328;--mut:#656d76;--red:#cf222e;--grn:#1a7f37;--org:#bc4c00}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+.wrap{max-width:880px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:8px 0 2px}
+.sub{color:var(--mut);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;font-weight:600;margin:10px 0 3px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+textarea{min-height:64px}
+input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
+.hint{font-size:12px;color:var(--mut);margin-top:2px}
+.btn{display:inline-block;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer;background:var(--b);color:#fff}
+.btn.sec{background:#eef1f4;color:var(--txt)}
+.btn.danger{background:var(--red)}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;color:#fff;text-transform:capitalize}
+.p-active{background:var(--grn)}.p-coming_soon{background:var(--b)}.p-pending{background:var(--org)}
+.p-sold,.p-off_market,.p-withdrawn,.p-expired,.p-prospect{background:#57606a}
+.listrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.listrow .addr{font-weight:700}
+.listrow .meta{color:var(--mut);font-size:13px}
+.quick{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.quick select,.quick input{width:auto;flex:0 0 auto}
+.sect{border-left:4px solid var(--b);padding-left:10px;margin:22px 0 4px;font-size:15px;font-weight:700}
+.sect.priv{border-color:var(--red);color:var(--red)}
+.privbox{border:2px solid var(--red);border-radius:10px;padding:4px 12px 12px;background:#fff5f5}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+#msg{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#1f2328;color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏠 Listing Manager</h1>
+  <div class="sub">What you save here is what the AI receptionist says on the very next call.</div>
+
+  <div id="login" class="card" style="display:none">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div style="margin-top:10px"><button class="btn" id="loginbtn">Sign in</button></div>
+  </div>
+
+  <div id="list" style="display:none">
+    <div class="topbar"><div></div><button class="btn" id="newbtn">+ New listing</button></div>
+    <div id="cards"></div>
+  </div>
+
+  <div id="form" style="display:none">
+    <div class="topbar">
+      <button class="btn sec" id="backbtn">&larr; All listings</button>
+      <button class="btn" id="savetop">Save listing</button>
+    </div>
+    <div class="card" id="fields"></div>
+    <div style="display:flex;justify-content:space-between;margin:8px 0 40px">
+      <button class="btn danger" id="delbtn" style="display:none">Delete</button>
+      <button class="btn" id="savebottom">Save listing</button>
+    </div>
+  </div>
+
+  <div id="msg"></div>
+</div>
+
+<script>
+"use strict";
+const API_URL = "https://wxntrwlalvhwsueqbiys.supabase.co/functions/v1/listing-admin";
+const OFFERS_DEFAULT = "yourguypete@gmail.com";
+
+let PW = localStorage.getItem("la_pw") || "";
+let editingId = null;
+
+const STATUS_OPTIONS = [
+  ["coming_soon","Coming soon"],["active","Active"],["pending","Pending"],
+  ["sold","Sold"],["withdrawn","Withdrawn"],["expired","Expired"],
+  ["off_market","Off market"],["prospect","Prospect"],
+];
+
+const FIELDS = [
+  {s:"Basics"},
+  {k:"address_line1", l:"Street address *"},
+  {k:"address_line2", l:"Unit / line 2"},
+  {k:"city", l:"City *"},
+  {k:"state", l:"State", d:"NY"},
+  {k:"zip", l:"ZIP"},
+  {k:"county", l:"County", d:"Suffolk"},
+  {k:"mls_number", l:"MLS number"},
+  {k:"property_type", l:"Property type", t:"select", d:"single_family", o:[
+    ["single_family","Single family"],["condo","Condo"],["coop","Co-op"],["townhouse","Townhouse"],
+    ["multi_family","Multi-family"],["land","Land"],["commercial","Commercial"],["other","Other"]]},
+  {s:"Pricing & Status"},
+  {k:"status", l:"Status", t:"select", d:"active", o:STATUS_OPTIONS,
+   h:"The bot only discusses Coming soon / Active / Pending listings"},
+  {k:"list_price", l:"List price ($)", t:"num"},
+  {k:"list_date", l:"List date", t:"date"},
+  {k:"expiration_date", l:"Listing expiration", t:"date"},
+  {k:"offer_status_public", l:"Offer status (the bot says this)",
+   h:'e.g. "Accepting offers" or "Multiple offers — highest and best by Friday 5pm"'},
+  {s:"Property Details"},
+  {k:"beds", l:"Bedrooms", t:"num"},
+  {k:"baths_full", l:"Full baths", t:"num"},
+  {k:"baths_half", l:"Half baths", t:"num"},
+  {k:"sqft", l:"Living sq ft", t:"num"},
+  {k:"lot_size_sqft", l:"Lot size (sq ft)", t:"num"},
+  {k:"year_built", l:"Year built", t:"num"},
+  {k:"parking", l:"Parking / garage"},
+  {k:"pets_policy", l:"Pets"},
+  {k:"what_conveys", l:"What conveys (appliances etc.)", t:"ta"},
+  {k:"utilities_note", l:"Utilities / heat / water"},
+  {s:"Schools, Taxes & HOA"},
+  {k:"annual_taxes", l:"Annual taxes ($)", t:"num"},
+  {k:"school_district", l:"School district"},
+  {k:"school_elementary", l:"Elementary"},
+  {k:"school_middle", l:"Middle"},
+  {k:"school_high", l:"High school"},
+  {k:"hoa", l:"HOA / common charges?", t:"bool"},
+  {k:"hoa_fee", l:"HOA fee ($)", t:"num"},
+  {k:"hoa_frequency", l:"HOA frequency", t:"select", o:[["",""],["monthly","Monthly"],["quarterly","Quarterly"],["annually","Annually"]]},
+  {s:"Showings — what the bot tells buyer's agents"},
+  {k:"showing_method", l:"Showing method", t:"select", d:"appointment_required", o:[
+    ["appointment_required","Appointment required"],["go_show","Go & show"],["call_before_showing","Call before showing"]],
+   h:"Appointment required / call-before = the bot collects the request and the office confirms; it never releases access"},
+  {k:"lockbox_type", l:"Lockbox device", t:"select", d:"Supra", o:[["Supra","Supra"],["SentriLock","SentriLock"],["none","None"]],
+   h:"Device only — the bot never knows or speaks codes"},
+  {k:"occupancy", l:"Occupancy", t:"select", d:"owner_occupied", o:[
+    ["owner_occupied","Owner occupied"],["tenant_occupied","Tenant occupied"],["vacant","Vacant"]]},
+  {k:"showing_instructions_public", l:"Showing instructions (spoken to callers)", t:"ta"},
+  {k:"showing_contact_name", l:"Showing contact name"},
+  {k:"showing_contact_phone", l:"Showing contact phone"},
+  {s:"Offers — what the bot tells buyer's agents"},
+  {k:"offers_email", l:"Send offers to (email)", d:OFFERS_DEFAULT},
+  {k:"offer_instructions", l:"Offer instructions", t:"ta",
+   d:"Submit on the standard NY board contract with proof of funds or lender pre-approval and signed buyer-agency disclosure."},
+  {k:"offer_deadline", l:"Offer deadline (optional)", t:"dt"},
+  {k:"disclosures_note", l:"Disclosures / docs (public pointer)"},
+  {s:"Marketing"},
+  {k:"public_remarks", l:"Public description (the bot may read from this)", t:"ta"},
+  {k:"open_house", l:"Open houses — one per line", t:"oh", h:'e.g. "Saturday June 14, 1-3pm"'},
+  {s:"PRIVATE — the bot can NEVER see or say these", priv:1},
+  {k:"lockbox_code", l:"Lockbox code", priv:1},
+  {k:"gate_code", l:"Gate / alarm code", priv:1},
+  {k:"coop_compensation", l:"Co-op compensation", priv:1},
+  {k:"private_remarks", l:"Private remarks", t:"ta", priv:1},
+  {k:"notes", l:"Internal notes", t:"ta", priv:1},
+];
+
+const $ = (id) => document.getElementById(id);
+function show(id){ ["login","list","form"].forEach(x => $(x).style.display = (x===id ? "" : "none")); }
+function toast(t){ const m=$("msg"); m.textContent=t; m.style.display="block"; setTimeout(()=>m.style.display="none",2600); }
+function money(n){ return n==null ? "—" : "$"+Number(n).toLocaleString(); }
+
+async function api(action, extra){
+  const res = await fetch(API_URL, {
+    method:"POST",
+    headers:{ "content-type":"application/json" },
+    body: JSON.stringify(Object.assign({action, password:PW}, extra||{})),
+  });
+  if (res.status===401){ PW=""; localStorage.removeItem("la_pw"); show("login"); throw new Error("Wrong password"); }
+  const d = await res.json();
+  if (d.error) throw new Error(d.error);
+  return d;
+}
+
+async function loadList(){
+  try {
+    const d = await api("list");
+    show("list");
+    const cards = $("cards");
+    cards.textContent = "";
+    if (!d.rows.length){
+      const c=document.createElement("div"); c.className="card";
+      c.textContent="No listings yet — tap “New listing”."; cards.appendChild(c); return;
+    }
+    for (const r of d.rows){
+      const card=document.createElement("div"); card.className="card";
+      const top=document.createElement("div"); top.className="listrow";
+      const left=document.createElement("div");
+      const addr=document.createElement("div"); addr.className="addr";
+      addr.textContent=(r.address_line1||"(no address)")+(r.city?", "+r.city:"");
+      const meta=document.createElement("div"); meta.className="meta";
+      meta.textContent=(r.mls_number?"MLS "+r.mls_number+" · ":"")+money(r.list_price);
+      left.append(addr,meta);
+      const pill=document.createElement("span"); pill.className="pill p-"+(r.status||"");
+      pill.textContent=(r.status||"").replace("_"," ");
+      top.append(left,pill);
+
+      const quick=document.createElement("div"); quick.className="quick";
+      const sel=document.createElement("select");
+      for (const [v,lab] of STATUS_OPTIONS){
+        const o=document.createElement("option"); o.value=v; o.textContent=lab;
+        if (r.status===v) o.selected=true; sel.appendChild(o);
+      }
+      const price=document.createElement("input");
+      price.type="number"; price.step="1000"; price.placeholder="Price";
+      price.style.maxWidth="130px"; price.value=r.list_price??"";
+      const upd=document.createElement("button"); upd.className="btn sec"; upd.textContent="Update";
+      upd.onclick=async()=>{ try{
+        await api("save",{row:{id:r.id,status:sel.value,list_price:price.value}});
+        toast("Updated — live on the next call"); loadList();
+      }catch(e){toast(e.message)} };
+      const edit=document.createElement("button"); edit.className="btn"; edit.textContent="Edit details";
+      edit.onclick=()=>openForm(r.id);
+      quick.append(sel,price,upd,edit);
+
+      card.append(top,quick); cards.appendChild(card);
+    }
+  } catch(e){ toast(e.message); }
+}
+
+function inputFor(f, val){
+  if (f.t==="select"){
+    const s=document.createElement("select"); s.id="f-"+f.k;
+    const cur=String(val ?? f.d ?? "");
+    for (const [v,lab] of f.o){
+      const o=document.createElement("option"); o.value=v; o.textContent=lab;
+      if (cur===v) o.selected=true; s.appendChild(o);
+    }
+    return s;
+  }
+  if (f.t==="ta" || f.t==="oh"){
+    const ta=document.createElement("textarea"); ta.id="f-"+f.k;
+    if (f.t==="oh") ta.value=Array.isArray(val)?val.join("\n"):"";
+    else ta.value=val??"";
+    return ta;
+  }
+  if (f.t==="bool"){
+    const wrap=document.createElement("div");
+    const c=document.createElement("input"); c.type="checkbox"; c.id="f-"+f.k; c.checked=!!val;
+    wrap.append(c,document.createTextNode(" yes"));
+    return wrap;
+  }
+  const i=document.createElement("input"); i.id="f-"+f.k;
+  if (f.t==="num"){ i.type="number"; i.step="any"; i.value=val??""; }
+  else if (f.t==="date"){ i.type="date"; i.value=val?String(val).slice(0,10):""; }
+  else if (f.t==="dt"){
+    i.type="datetime-local";
+    if (val){ const d=new Date(val); if(!isNaN(d)){
+      const p=(n)=>String(n).padStart(2,"0");
+      i.value=d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());
+    }}
+  }
+  else { i.value=val??(editingId?"":f.d??""); }
+  return i;
+}
+
+function render(row){
+  const root=$("fields"); root.textContent="";
+  let privBox=null;
+  for (const f of FIELDS){
+    if (f.s){
+      const h=document.createElement("div"); h.className="sect"+(f.priv?" priv":""); h.textContent=f.s;
+      root.appendChild(h);
+      privBox = f.priv ? document.createElement("div") : null;
+      if (privBox){ privBox.className="privbox"; root.appendChild(privBox); }
+      continue;
+    }
+    const target = privBox || root;
+    const lab=document.createElement("label"); lab.textContent=f.l; lab.htmlFor="f-"+f.k;
+    target.appendChild(lab);
+    target.appendChild(inputFor(f, row ? row[f.k] : (f.d ?? null)));
+    if (f.h){ const hint=document.createElement("div"); hint.className="hint"; hint.textContent=f.h; target.appendChild(hint); }
+  }
+  show("form"); window.scrollTo(0,0);
+}
+
+async function openForm(id){
+  editingId=id;
+  $("delbtn").style.display = id ? "" : "none";
+  if (!id){ render(null); return; }
+  try { const d=await api("get",{id}); render(d.row); } catch(e){ toast(e.message); }
+}
+
+function collect(){
+  const row={};
+  if (editingId) row.id=editingId;
+  for (const f of FIELDS){
+    if (!f.k) continue;
+    const e=$("f-"+f.k); if (!e) continue;
+    if (f.t==="bool"){ row[f.k]=e.checked; continue; }
+    if (f.t==="oh"){
+      const lines=e.value.split("\n").map(x=>x.trim()).filter(Boolean);
+      row[f.k]=lines.length?lines:null; continue;
+    }
+    if (f.t==="dt"){ row[f.k]=e.value?new Date(e.value).toISOString():""; continue; }
+    row[f.k]=e.value;
+  }
+  return row;
+}
+
+async function save(){
+  const row=collect();
+  if (!row.address_line1 || !row.city){ toast("Street address and city are required"); return; }
+  try {
+    const d=await api("save",{row});
+    toast("Saved — live on the next call");
+    editingId=d.id;
+    loadList();
+  } catch(e){ toast(e.message); }
+}
+
+async function del(){
+  if (!editingId) return;
+  if (!confirm("Delete this listing? If it has call history, use status “Off market” instead.")) return;
+  try { await api("delete",{id:editingId}); toast("Deleted"); loadList(); }
+  catch(e){ toast(e.message); }
+}
+
+$("loginbtn").onclick=()=>{ PW=$("pw").value.trim(); localStorage.setItem("la_pw",PW); loadList(); };
+$("pw").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("loginbtn").click(); });
+$("newbtn").onclick=()=>openForm(null);
+$("backbtn").onclick=()=>loadList();
+$("savetop").onclick=save;
+$("savebottom").onclick=save;
+$("delbtn").onclick=del;
+
+if (PW) loadList(); else show("login");
+</script>
+</body>
+</html>

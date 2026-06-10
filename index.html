@@ -144,8 +144,8 @@ const FIELDS = [
   {k:"showing_method", l:"Showing method", t:"select", d:"appointment_required", o:[
     ["appointment_required","Appointment required"],["go_show","Go & show"],["call_before_showing","Call before showing"]],
    h:"Appointment required / call-before = the bot collects the request and the office confirms; it never releases access"},
-  {k:"lockbox_type", l:"Lockbox device", t:"select", d:"Supra", o:[["Supra","Supra"],["SentriLock","SentriLock"],["none","None"]],
-   h:"Device only — the bot never knows or speaks codes"},
+  {k:"lockbox_type", l:"Lockbox device", t:"select", d:"coded", o:[["coded","Coded (code sent via ShowingTime)"],["Supra","Supra"],["SentriLock","SentriLock"],["none","None"]],
+   h:"The bot never speaks codes. Coded = ShowingTime delivers the code by email/text on confirmation; bot directs agents to call ShowingTime if missing, escalates to Jaime as last resort"},
   {k:"occupancy", l:"Occupancy", t:"select", d:"owner_occupied", o:[
     ["owner_occupied","Owner occupied"],["tenant_occupied","Tenant occupied"],["vacant","Vacant"]]},
   {k:"showing_instructions_public", l:"Showing instructions (spoken to callers)", t:"ta",

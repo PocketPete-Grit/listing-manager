@@ -158,6 +158,7 @@ const FIELDS = [
   {k:"offer_instructions", l:"Offer instructions", t:"ta",
    d:"Submit on the standard NY board contract with proof of funds or lender pre-approval and signed buyer-agency disclosure."},
   {k:"offer_deadline", l:"Offer deadline (optional)", t:"dt"},
+  {k:"_hnb", t:"hnbbtn", h:'One tap: sets "highest & best offers due next Monday 12 PM" as the offer status + deadline. Auto-clears after that Monday. (New listings get this automatically for their first week.)'},
   {k:"disclosures_note", l:"Disclosures / docs (public pointer)"},
   {s:"Marketing"},
   {k:"public_remarks", l:"Public description (the bot may read from this)", t:"ta"},
@@ -287,6 +288,13 @@ function render(row){
       continue;
     }
     const target = privBox || root;
+    if (f.t==="hnbbtn"){
+      const b=document.createElement("button"); b.type="button"; b.className="btn sec";
+      b.style.marginTop="6px"; b.textContent="📣 Highest & best — offers due next Mon 12 PM";
+      b.onclick=hnbSet; target.appendChild(b);
+      if (f.h){ const hint=document.createElement("div"); hint.className="hint"; hint.textContent=f.h; target.appendChild(hint); }
+      continue;
+    }
     const lab=document.createElement("label"); lab.textContent=f.l; lab.htmlFor="f-"+f.k;
     target.appendChild(lab);
     target.appendChild(inputFor(f, row ? row[f.k] : (f.d ?? null)));
@@ -336,6 +344,15 @@ async function save(){
     toast("Saved — live on the next call");
     editingId=d.id;
     loadList();
+  } catch(e){ toast(e.message); }
+}
+
+async function hnbSet(){
+  if (!editingId){ toast("Save the listing first, then set highest & best"); return; }
+  try {
+    const d=await api("set_hnb",{id:editingId});
+    toast("Set — offers due "+(d.label||"next Monday")+" 12 PM (live on the next call)");
+    openForm(editingId);
   } catch(e){ toast(e.message); }
 }
 

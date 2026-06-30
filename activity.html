@@ -147,6 +147,44 @@ function card(a){
     const pre = document.createElement("pre"); pre.textContent = a.metadata.transcript;
     det.append(sum, pre); c.appendChild(det);
   }
+
+  // --- forward this message (transcript summary + recording link) to a teammate ---
+  if (a.id && a.type !== "note"){
+    const hasRec = !!(a.metadata && a.metadata.recording_url);
+    const fwdWrap = document.createElement("div"); fwdWrap.style.marginTop = "10px";
+    const fwdBtn = document.createElement("button");
+    fwdBtn.className = "btn sec"; fwdBtn.style.fontSize = "13px"; fwdBtn.style.padding = "6px 12px";
+    fwdBtn.textContent = hasRec ? "↪ Forward (incl. recording)" : "↪ Forward";
+    const panel = document.createElement("div"); panel.style.display = "none"; panel.style.marginTop = "8px";
+    const prow = document.createElement("div"); prow.className = "row1";
+    const sel = document.createElement("select");
+    [["pete","Me (Pete)"],["jaime","Jaime"],["katie","Katie / front desk"],["custom","Custom number…"]]
+      .forEach(([v,l]) => { const o=document.createElement("option"); o.value=v; o.textContent=l; sel.appendChild(o); });
+    const custom = document.createElement("input");
+    custom.placeholder = "Phone number"; custom.inputMode = "tel";
+    custom.style.display = "none"; custom.style.width = "150px";
+    sel.onchange = () => { custom.style.display = sel.value === "custom" ? "" : "none"; };
+    const sendB = document.createElement("button");
+    sendB.className = "btn"; sendB.style.fontSize = "13px"; sendB.style.padding = "6px 12px";
+    sendB.textContent = "Send";
+    prow.append(sel, custom, sendB);
+    const note = document.createElement("input");
+    note.placeholder = "Add a note (optional)"; note.style.width = "100%"; note.style.marginTop = "6px";
+    panel.append(prow, note);
+    fwdBtn.onclick = () => { panel.style.display = panel.style.display === "none" ? "" : "none"; };
+    sendB.onclick = async () => {
+      const to = sel.value === "custom" ? custom.value.trim() : sel.value;
+      if (!to){ toast("Pick a teammate or enter a number"); return; }
+      sendB.disabled = true; sendB.textContent = "Sending…";
+      try {
+        const r = await api("forward_message", { activity_id: a.id, to, note: note.value.trim() });
+        toast("Sent to " + (r.to || "team")); panel.style.display = "none"; note.value = "";
+      } catch(e){ toast(e.message); }
+      finally { sendB.disabled = false; sendB.textContent = "Send"; }
+    };
+    fwdWrap.append(fwdBtn, panel);
+    c.appendChild(fwdWrap);
+  }
   return c;
 }
 

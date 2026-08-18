@@ -90,10 +90,11 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
 <script>
 "use strict";
 const API_URL = "https://wxntrwlalvhwsueqbiys.supabase.co/functions/v1/listing-admin";
-const OFFERS_DEFAULT = "yourguypete@gmail.com";
+const OFFERS_DEFAULT = "yourguypete+offer@gmail.com";
 
 let PW = localStorage.getItem("la_pw") || "";
 let editingId = null;
+let BUYER_AGENTS = []; // roster names, filled by the "get" response
 
 const STATUS_OPTIONS = [
   ["coming_soon","Coming soon"],["active","Active"],["pending","Pending"],
@@ -153,6 +154,9 @@ const FIELDS = [
    d:"All showings are scheduled through ShowingTime — please book there and you'll receive confirmation. Appointment required."},
   {k:"showing_contact_name", l:"Showing contact name"},
   {k:"showing_contact_phone", l:"Showing contact phone"},
+  {s:"Buyer leads — who gets the callers on this home"},
+  {k:"_buyer_agent", l:"Send buyer leads to", t:"agentsel",
+   h:"Rotate = normal alternating turn. Pick a name to send EVERY buyer who calls about this home to that agent instead. Only affects consumers asking to see it — cooperating agents still go to ShowingTime."},
   {s:"Offers — what the bot tells buyer's agents"},
   {k:"offers_email", l:"Send offers to (email)", d:OFFERS_DEFAULT},
   {k:"offer_instructions", l:"Offer instructions", t:"ta",
@@ -240,6 +244,16 @@ async function loadList(){
 }
 
 function inputFor(f, val){
+  if (f.t==="agentsel"){
+    const s=document.createElement("select"); s.id="f-"+f.k;
+    const cur=String(val ?? "");
+    const opts=[["","Rotate (alternate as usual)"]].concat(BUYER_AGENTS.map(n=>[n,n+" — every lead on this home"]));
+    for (const [v,lab] of opts){
+      const o=document.createElement("option"); o.value=v; o.textContent=lab;
+      if (cur===v) o.selected=true; s.appendChild(o);
+    }
+    return s;
+  }
   if (f.t==="select"){
     const s=document.createElement("select"); s.id="f-"+f.k;
     const cur=String(val ?? f.d ?? "");
@@ -307,7 +321,11 @@ async function openForm(id){
   editingId=id;
   $("delbtn").style.display = id ? "" : "none";
   if (!id){ render(null); return; }
-  try { const d=await api("get",{id}); render(d.row); } catch(e){ toast(e.message); }
+  try {
+    const d=await api("get",{id});
+    if (Array.isArray(d.buyer_agents)) BUYER_AGENTS=d.buyer_agents;
+    render(d.row);
+  } catch(e){ toast(e.message); }
 }
 
 function collect(){

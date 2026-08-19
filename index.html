@@ -162,6 +162,8 @@ const FIELDS = [
   {k:"offer_instructions", l:"Offer instructions", t:"ta",
    d:"Submit on the standard NY board contract with proof of funds or lender pre-approval and signed buyer-agency disclosure."},
   {k:"offer_deadline", l:"Offer deadline (optional)", t:"dt"},
+  {k:"_offer_accepted", t:"acceptbtn",
+   h:"Agents hear it and are told backups are welcome. Buyers are NEVER told an offer was accepted \u2014 they get routed to the team. Clears the public offer line so nothing leaks."},
   {k:"_hnb", t:"hnbbtn", h:'One tap: sets "highest & best offers due next Monday 12 PM" as the offer status + deadline. Auto-clears after that Monday. (New listings get this automatically for their first week.)'},
   {k:"disclosures_note", l:"Disclosures / docs (public pointer)"},
   {s:"Marketing"},
@@ -302,6 +304,15 @@ function render(row){
       continue;
     }
     const target = privBox || root;
+    if (f.t==="acceptbtn"){
+      const on = !!(row && row._offer_accepted);
+      const b=document.createElement("button"); b.type="button"; b.className="btn"+(on?"":" sec");
+      b.style.marginTop="6px";
+      b.textContent = on ? "\u2705 Offer accepted \u2014 still showing (tap to undo)" : "\u2705 Mark offer accepted \u2014 still showing";
+      b.onclick=()=>acceptedSet(!on); target.appendChild(b);
+      if (f.h){ const hint=document.createElement("div"); hint.className="hint"; hint.textContent=f.h; target.appendChild(hint); }
+      continue;
+    }
     if (f.t==="hnbbtn"){
       const b=document.createElement("button"); b.type="button"; b.className="btn sec";
       b.style.marginTop="6px"; b.textContent="📣 Highest & best — offers due next Mon 12 PM";
@@ -362,6 +373,15 @@ async function save(){
     toast("Saved — live on the next call");
     editingId=d.id;
     loadList();
+  } catch(e){ toast(e.message); }
+}
+
+async function acceptedSet(on){
+  if (!editingId){ toast("Save the listing first, then mark the offer accepted"); return; }
+  try {
+    await api("set_offer_accepted",{id:editingId,accepted:on});
+    toast(on ? "Accepted \u2014 agents told, buyers routed to the team" : "Cleared \u2014 back to normal offer status");
+    openForm(editingId);
   } catch(e){ toast(e.message); }
 }
 

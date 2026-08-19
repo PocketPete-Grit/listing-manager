@@ -154,6 +154,11 @@ const FIELDS = [
    d:"All showings are scheduled through ShowingTime — please book there and you'll receive confirmation. Appointment required."},
   {k:"showing_contact_name", l:"Showing contact name"},
   {k:"showing_contact_phone", l:"Showing contact phone"},
+  {s:"Co-listing agent — gets every alert you and Jaime get on this home"},
+  {k:"_co_agent_name", l:"Co-listing agent name"},
+  {k:"_co_agent_cell", l:"Their cell (gets the texts)"},
+  {k:"_co_agent_email", l:"Their email (optional)"},
+  {k:"_co_note", t:"conote"},
   {s:"Buyer leads — who gets the callers on this home"},
   {k:"_buyer_agent", l:"Send buyer leads to", t:"agentsel",
    h:"Rotate = normal alternating turn. Pick a name to send EVERY buyer who calls about this home to that agent instead. Only affects consumers asking to see it — cooperating agents still go to ShowingTime."},
@@ -304,6 +309,11 @@ function render(row){
       continue;
     }
     const target = privBox || root;
+    if (f.t==="conote"){
+      const d=document.createElement("div"); d.className="hint";
+      d.textContent="Copied on call escalations, text handoffs, and buyer matches for THIS listing only \u2014 never your other listings, and never the weekly portfolio report. Clear the cell and email to remove them.";
+      target.appendChild(d); continue;
+    }
     if (f.t==="acceptbtn"){
       const on = !!(row && row._offer_accepted);
       const b=document.createElement("button"); b.type="button"; b.className="btn"+(on?"":" sec");

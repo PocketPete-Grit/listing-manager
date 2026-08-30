@@ -45,7 +45,8 @@ input[type=checkbox]{width:auto;transform:scale(1.3);margin-right:8px}
   <div id="login" class="card" style="display:none">
     <label for="pw">Password</label>
     <input id="pw" type="password" autocomplete="current-password">
-    <div style="margin-top:10px"><button class="btn" id="loginbtn">Sign in</button></div>
+    <div style="margin-top:10px"><button class="btn" id="loginbtn">Sign in</button>
+      <button class="btn sec" id="forgotbtn" style="margin-left:8px">Forgot password? Text me</button></div>
   </div>
 
   <div id="list" style="display:none">
@@ -487,6 +488,17 @@ async function smartPaste(){
 $("spbtn").onclick=smartPaste;
 
 $("loginbtn").onclick=()=>{ PW=$("pw").value.trim(); localStorage.setItem("la_pw",PW); loadList(); };
+$("forgotbtn").onclick = async ()=>{
+  const b=$("forgotbtn"); b.disabled=true; b.textContent="Sending…";
+  try {
+    const res = await fetch(API_URL, { method:"POST", headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ action:"forgot_password" }) });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    toast("Texted to Pete's cell 📱");
+  } catch(e){ toast(e.message); }
+  finally { b.disabled=false; b.textContent="Forgot password? Text me"; }
+};
 $("pw").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("loginbtn").click(); });
 $("newbtn").onclick=()=>openForm(null);
 $("backbtn").onclick=()=>loadList();

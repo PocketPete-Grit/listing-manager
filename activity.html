@@ -45,7 +45,8 @@ audio{width:100%;margin-top:8px;height:34px}
   <div id="login" class="card" style="display:none">
     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px" for="pw">Password</label>
     <input id="pw" type="password" style="width:100%">
-    <div style="margin-top:10px"><button class="btn" id="loginbtn">Sign in</button></div>
+    <div style="margin-top:10px"><button class="btn" id="loginbtn">Sign in</button>
+      <button class="btn sec" id="forgotbtn" style="margin-left:8px">Forgot password? Text me</button></div>
   </div>
 
   <div id="app" style="display:none">
@@ -226,6 +227,17 @@ async function boot(){
 }
 
 $("loginbtn").onclick = ()=>{ PW=$("pw").value.trim(); localStorage.setItem("la_pw",PW); boot(); };
+$("forgotbtn").onclick = async ()=>{
+  const b=$("forgotbtn"); b.disabled=true; b.textContent="Sending…";
+  try {
+    const res = await fetch(API_URL, { method:"POST", headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ action:"forgot_password" }) });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    toast("Texted to Pete's cell 📱");
+  } catch(e){ toast(e.message); }
+  finally { b.disabled=false; b.textContent="Forgot password? Text me"; }
+};
 $("pw") && $("pw").addEventListener("keydown",(e)=>{ if(e.key==="Enter") $("loginbtn").click(); });
 document.querySelectorAll(".chip").forEach((ch)=>{ ch.onclick=()=>{
   document.querySelectorAll(".chip").forEach((x)=>x.classList.remove("on"));

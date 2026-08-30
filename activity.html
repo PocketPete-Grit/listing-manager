@@ -183,7 +183,19 @@ function card(a){
       } catch(e){ toast(e.message); }
       finally { sendB.disabled = false; sendB.textContent = "Send"; }
     };
-    fwdWrap.append(fwdBtn, panel);
+    if (hasRec){
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "btn sec"; shareBtn.style.fontSize = "13px"; shareBtn.style.padding = "6px 12px"; shareBtn.style.marginLeft = "8px";
+      shareBtn.textContent = "🔗 Copy share link";
+      shareBtn.onclick = async () => {
+        const link = "https://pocketpete-grit.github.io/listing-manager/play.html?c=" + a.id;
+        try { await navigator.clipboard.writeText(link); toast("Link copied — paste it in a text 📋"); }
+        catch { prompt("Copy this link:", link); }
+      };
+      fwdWrap.append(fwdBtn, shareBtn, panel);
+    } else {
+      fwdWrap.append(fwdBtn, panel);
+    }
     c.appendChild(fwdWrap);
   }
   return c;

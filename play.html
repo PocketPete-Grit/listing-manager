@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Call recording — Pete Grosso Team</title>
+<style>
+:root{--b:#1f6feb;--bg:#f6f8fa;--card:#fff;--line:#d8dee4;--txt:#1f2328;--mut:#656d76}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--txt)}
+.wrap{max-width:560px;margin:0 auto;padding:24px 16px}
+.brand{font-size:13px;font-weight:700;color:var(--mut);margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+.who{font-size:18px;font-weight:700;color:#0b2240}
+.meta{font-size:13px;color:var(--mut);margin-top:2px}
+.tag{display:inline-block;background:#e7f0ff;color:#0b4dba;border-radius:6px;padding:2px 9px;font-size:12px;font-weight:700;margin-top:8px}
+audio{width:100%;margin-top:16px;height:40px}
+.sum{margin-top:14px;font-size:14px;line-height:1.55;border-top:1px solid var(--line);padding-top:12px}
+.state{color:var(--mut);text-align:center;padding:40px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">📞 Pete Grosso Team — AI receptionist call</div>
+  <div id="out" class="card"><div class="state">Loading…</div></div>
+</div>
+
+<script>
+"use strict";
+const API_URL = "https://wxntrwlalvhwsueqbiys.supabase.co/functions/v1/listing-admin";
+const id = new URLSearchParams(location.search).get("c") || "";
+
+function fmtWhen(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) + " " +
+         d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+}
+function fmtDur(s){ if(!s) return ""; return ` · ${Math.floor(s/60)}m ${s%60}s`; }
+
+async function boot(){
+  const out = document.getElementById("out");
+  const fail = (t)=>{ out.innerHTML=""; const d=document.createElement("div"); d.className="state"; d.textContent=t; out.appendChild(d); };
+  if (!id) return fail("This link is missing its call id.");
+  let d;
+  try {
+    const res = await fetch(API_URL, { method:"POST", headers:{ "content-type":"application/json" },
+      body: JSON.stringify({ action:"shared_recording", id }) });
+    d = await res.json();
+    if (d.error) throw new Error(d.error);
+  } catch(e){ return fail("Recording not found — the link may be wrong or the call was removed."); }
+
+  out.innerHTML = "";
+  const who = document.createElement("div"); who.className="who"; who.textContent = "📞 " + d.who;
+  const meta = document.createElement("div"); meta.className="meta"; meta.textContent = fmtWhen(d.occurred_at) + fmtDur(d.duration_seconds);
+  out.append(who, meta);
+  if (d.address){ const t=document.createElement("div"); const s=document.createElement("span"); s.className="tag"; s.textContent=d.address; t.appendChild(s); out.appendChild(t); }
+  const au = document.createElement("audio"); au.controls = true; au.src = d.recording_url; out.appendChild(au);
+  if (d.summary){ const s=document.createElement("div"); s.className="sum"; s.textContent = d.summary; out.appendChild(s); }
+}
+boot();
+</script>
+</body>
+</html>
